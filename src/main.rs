@@ -7,6 +7,9 @@ extern crate failure;
 extern crate clap;
 use clap::{App, AppSettings, Arg, SubCommand};
 
+mod list;
+use list::run as list;
+
 #[derive(Debug, PartialEq)]
 enum Verbosity {
     Verbose,
@@ -115,13 +118,6 @@ fn main() {
         ("previous", _) => unimplemented!("previous is not implemented yet"),
         (unknown, _) => panic!("Software bug: No subcommand is implemented for {}", unknown),
     }
-}
-
-fn list(settings: &Settings) {
-    eprintln!(
-        "This should be a list, but that's not done yet. At least you can see your settings:\n{:#?}",
-        settings,
-    );
 }
 
 #[cfg(test)]
