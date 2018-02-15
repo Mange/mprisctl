@@ -9,10 +9,10 @@ extern crate clap;
 use clap::{App, AppSettings, Arg, SubCommand};
 
 mod list;
-mod play;
+mod basic_command;
 
 use list::run as list;
-use play::run as play;
+use basic_command::run as basic_command;
 
 use mpris::{Player, PlayerFinder};
 
@@ -71,7 +71,7 @@ impl<'a> From<&'a clap::ArgMatches<'a>> for Settings {
 }
 
 impl Settings {
-    fn find_player(&self) -> Result<Player, Error> {
+    fn find_player<'p>(&self) -> Result<Player<'p>, Error> {
         use mpris::FindingError;
         let finder = PlayerFinder::new()?;
 
@@ -161,11 +161,11 @@ fn main() {
 
     let result = match matches.subcommand() {
         ("list", _) => list(&settings),
-        ("play", _) => play(&settings),
-        ("pause", _) => unimplemented!("pause is not implemented yet"),
-        ("toggle_pause", _) => unimplemented!("toggle_pause is not implemented yet"),
-        ("next", _) => unimplemented!("next is not implemented yet"),
-        ("previous", _) => unimplemented!("previous is not implemented yet"),
+        ("play", _) => basic_command("Play", Player::checked_play, &settings),
+        ("pause", _) => basic_command("Pause", Player::checked_pause, &settings),
+        ("toggle_pause", _) => basic_command("Play/Pause", Player::checked_play_pause, &settings),
+        ("next", _) => basic_command("Next", Player::checked_next, &settings),
+        ("previous", _) => basic_command("Previous", Player::checked_previous, &settings),
         (unknown, _) => panic!("Software bug: No subcommand is implemented for {}", unknown),
     };
 
