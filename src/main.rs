@@ -1,3 +1,4 @@
+extern crate caseless;
 extern crate mpris;
 
 #[macro_use]
@@ -80,10 +81,23 @@ impl Settings {
                 Err(FindingError::DBusError(err)) => Err(err.into()),
                 Err(FindingError::NoPlayerFound) => Err(Error::AutomaticPlayerNotFound),
             },
-            PlayerSelection::WithName(ref _name) => {
-                unimplemented!("Cannot match players on their names yet.");
-            }
+            PlayerSelection::WithName(ref name) => match finder.find_all() {
+                Ok(players) => find_player_with_name(players, name),
+                Err(FindingError::DBusError(err)) => Err(err.into()),
+                Err(FindingError::NoPlayerFound) => Err(Error::NamedPlayerNotFound(name.clone())),
+            },
         }
+    }
+}
+
+fn find_player_with_name<'a>(players: Vec<Player<'a>>, name: &str) -> Result<Player<'a>, Error> {
+    let found_player = players
+        .into_iter()
+        .find(|player| caseless::default_caseless_match_str(player.identity(), name));
+
+    match found_player {
+        Some(player) => Ok(player),
+        None => Err(Error::NamedPlayerNotFound(String::from(name))),
     }
 }
 
@@ -91,6 +105,7 @@ impl Settings {
 pub enum Error {
     #[fail(display = "{}", _0)] DBusError(mpris::DBusError),
     #[fail(display = "Could not find any player")] AutomaticPlayerNotFound,
+    #[fail(display = "Could not find any player with name \"{}\"", _0)] NamedPlayerNotFound(String),
 }
 
 impl From<mpris::DBusError> for Error {
