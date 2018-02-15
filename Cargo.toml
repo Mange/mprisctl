@@ -1,0 +1,6 @@
+[package]
+name = "mprisctl"
+version = "0.1.0"
+authors = ["Magnus Bergmark <magnus.bergmark@gmail.com>"]
+
+[dependencies]
