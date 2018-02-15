@@ -37,8 +37,8 @@ impl Default for PlayerSelection {
 
 #[derive(Debug, Default)]
 struct Settings {
-    verbosity: Verbosity,
-    player_selection: PlayerSelection,
+    pub verbosity: Verbosity,
+    pub player_selection: PlayerSelection,
 }
 
 impl<'a> From<&'a clap::ArgMatches<'a>> for Settings {
@@ -62,6 +62,11 @@ impl<'a> From<&'a clap::ArgMatches<'a>> for Settings {
             verbosity: verbosity,
         }
     }
+}
+
+#[derive(Debug, Fail)]
+pub enum Error {
+    #[fail(display = "{}", _0)] DBusError(mpris::DBusError),
 }
 
 fn build_app<'a, 'b>() -> App<'a, 'b> {
@@ -109,7 +114,7 @@ fn main() {
     let matches = app.get_matches();
     let settings = Settings::from(&matches);
 
-    match matches.subcommand() {
+    let result = match matches.subcommand() {
         ("list", _) => list(&settings),
         ("play", _) => unimplemented!("play is not implemented yet"),
         ("pause", _) => unimplemented!("pause is not implemented yet"),
@@ -117,6 +122,14 @@ fn main() {
         ("next", _) => unimplemented!("next is not implemented yet"),
         ("previous", _) => unimplemented!("previous is not implemented yet"),
         (unknown, _) => panic!("Software bug: No subcommand is implemented for {}", unknown),
+    };
+
+    match result {
+        Ok(()) => { /* :-) */ }
+        Err(error) => {
+            eprintln!("{}", error);
+            ::std::process::exit(1);
+        }
     }
 }
 
