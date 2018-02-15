@@ -10,15 +10,15 @@ where
     let player = settings.find_player()?;
 
     if action(&player)? {
-        command_completed(name, &settings.verbosity, &player);
+        command_sent(name, &settings.verbosity, &player);
         Ok(())
     } else {
-        command_failed(name, &settings.verbosity, &player);
+        command_not_supported(name, &settings.verbosity, &player);
         Ok(())
     }
 }
 
-fn command_completed(name: &'static str, verbosity: &Verbosity, player: &Player) {
+fn command_sent(name: &'static str, verbosity: &Verbosity, player: &Player) {
     match *verbosity {
         Verbosity::Quiet | Verbosity::Normal => {}
         Verbosity::Verbose => {
@@ -27,7 +27,7 @@ fn command_completed(name: &'static str, verbosity: &Verbosity, player: &Player)
     }
 }
 
-fn command_failed(name: &'static str, verbosity: &Verbosity, player: &Player) {
+fn command_not_supported(name: &'static str, verbosity: &Verbosity, player: &Player) {
     match *verbosity {
         Verbosity::Quiet => {}
         Verbosity::Normal | Verbosity::Verbose => {
