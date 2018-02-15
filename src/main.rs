@@ -8,7 +8,12 @@ extern crate clap;
 use clap::{App, AppSettings, Arg, SubCommand};
 
 mod list;
+mod play;
+
 use list::run as list;
+use play::run as play;
+
+use mpris::{Player, PlayerFinder};
 
 #[derive(Debug, PartialEq)]
 enum Verbosity {
@@ -64,9 +69,34 @@ impl<'a> From<&'a clap::ArgMatches<'a>> for Settings {
     }
 }
 
+impl Settings {
+    fn find_player(&self) -> Result<Player, Error> {
+        use mpris::FindingError;
+        let finder = PlayerFinder::new()?;
+
+        match self.player_selection {
+            PlayerSelection::Automatic => match finder.find_active() {
+                Ok(player) => Ok(player),
+                Err(FindingError::DBusError(err)) => Err(err.into()),
+                Err(FindingError::NoPlayerFound) => Err(Error::AutomaticPlayerNotFound),
+            },
+            PlayerSelection::WithName(ref _name) => {
+                unimplemented!("Cannot match players on their names yet.");
+            }
+        }
+    }
+}
+
 #[derive(Debug, Fail)]
 pub enum Error {
     #[fail(display = "{}", _0)] DBusError(mpris::DBusError),
+    #[fail(display = "Could not find any player")] AutomaticPlayerNotFound,
+}
+
+impl From<mpris::DBusError> for Error {
+    fn from(dbus_error: mpris::DBusError) -> Error {
+        Error::DBusError(dbus_error)
+    }
 }
 
 fn build_app<'a, 'b>() -> App<'a, 'b> {
@@ -116,7 +146,7 @@ fn main() {
 
     let result = match matches.subcommand() {
         ("list", _) => list(&settings),
-        ("play", _) => unimplemented!("play is not implemented yet"),
+        ("play", _) => play(&settings),
         ("pause", _) => unimplemented!("pause is not implemented yet"),
         ("toggle_pause", _) => unimplemented!("toggle_pause is not implemented yet"),
         ("next", _) => unimplemented!("next is not implemented yet"),

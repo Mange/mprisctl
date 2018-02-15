@@ -3,12 +3,6 @@ use mpris::Player;
 
 use super::{Error, Settings, Verbosity};
 
-impl From<mpris::DBusError> for Error {
-    fn from(dbus_error: mpris::DBusError) -> Error {
-        Error::DBusError(dbus_error)
-    }
-}
-
 pub(crate) fn run(settings: &Settings) -> Result<(), Error> {
     let finder = mpris::PlayerFinder::new()?;
     let players = match finder.find_all() {
