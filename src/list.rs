@@ -36,13 +36,13 @@ pub(crate) fn run(settings: &Settings) -> Result<(), Error> {
     for player in players.iter() {
         match settings.verbosity {
             Verbosity::Normal => {
-                eprintln!("{}", player.identity());
+                println!("{}", player.identity());
             }
             Verbosity::Quiet => {
-                eprintln!("{}", player.identity());
+                println!("{}", player.identity());
             }
             Verbosity::Verbose => {
-                eprintln!("{}", verbose_player(player)?);
+                println!("{}", verbose_player(player)?);
             }
         }
     }
