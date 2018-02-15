@@ -99,6 +99,7 @@ dependencies = [
 name = "mprisctl"
 version = "0.1.0"
 dependencies = [
+ "failure 0.1.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "mpris 1.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
 
