@@ -27,12 +27,9 @@ pub(crate) fn run(settings: &Settings) -> Result<(), Error> {
         eprintln!("Found players:");
     }
 
-    for player in players.iter() {
+    for player in &players {
         match settings.verbosity {
-            Verbosity::Normal => {
-                println!("{}", player.identity());
-            }
-            Verbosity::Quiet => {
+            Verbosity::Normal | Verbosity::Quiet => {
                 println!("{}", player.identity());
             }
             Verbosity::Verbose => {

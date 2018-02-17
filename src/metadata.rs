@@ -35,7 +35,7 @@ impl MetadataValue {
     fn try_from(arg: &RefArg) -> Option<MetadataValue> {
         match arg.arg_type() {
             ArgType::String => arg.as_str().map(|s| MetadataValue::String(String::from(s))),
-            ArgType::Int64 => arg.as_i64().map(|i| MetadataValue::Int64(i)),
+            ArgType::Int64 => arg.as_i64().map(MetadataValue::Int64),
             ArgType::Array => arg.as_iter()
                 .map(|iter| MetadataValue::Array(iter.flat_map(MetadataValue::try_from).collect())),
             _ => None,
@@ -155,7 +155,7 @@ fn print_metadata<'a>(view: &'a MetadataView<'a>) -> Result<(), Error> {
 // Length of longest text field text ("Album artists")
 const TEXT_FIELD_PADDING: usize = 13;
 
-fn print_text_field<'a, T: Display>(title: &'static str, value: &Option<T>) {
+fn print_text_field<T: Display>(title: &'static str, value: &Option<T>) {
     match *value {
         Some(ref val) => println!(
             "{title:width$}\t{value}",
