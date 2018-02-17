@@ -1,14 +1,54 @@
+extern crate dbus;
 extern crate mpris;
+extern crate serde;
 extern crate serde_json;
 
 use std::fmt::Display;
+use std::collections::HashMap;
 use super::{Error, Settings};
 use clap::ArgMatches;
+use self::dbus::arg::{ArgType, RefArg};
+use self::serde::{Serialize, Serializer};
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 enum Format {
     Text,
     JSON,
+}
+
+#[derive(Debug)]
+enum MetadataValue {
+    String(String),
+    Int16(i16),
+    UInt16(u16),
+    Int32(i32),
+    UInt32(u32),
+    Int64(i64),
+    UInt64(u64),
+    Double(f64),
+    Boolean(bool),
+    Array(Vec<MetadataValue>),
+}
+
+impl MetadataValue {
+    fn try_from(arg: &RefArg) -> Option<MetadataValue> {
+        match arg.arg_type() {
+            ArgType::String => arg.as_str().map(|s| MetadataValue::String(String::from(s))),
+            _ => unimplemented!("Oh noes"),
+        }
+    }
+}
+
+impl Serialize for MetadataValue {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        match *self {
+            MetadataValue::String(ref s) => serializer.serialize_str(s),
+            _ => unimplemented!(),
+        }
+    }
 }
 
 #[derive(Debug, Serialize)]
@@ -28,7 +68,7 @@ struct MetadataView<'a> {
     track_id: &'a str,
     track_number: Option<i32>,
     url: Option<&'a str>,
-    // rest: HashMap<String, MetadataValue>,
+    rest: HashMap<String, MetadataValue>,
 }
 
 impl<'a> From<&'a mpris::Metadata> for MetadataView<'a> {
@@ -48,6 +88,17 @@ impl<'a> From<&'a mpris::Metadata> for MetadataView<'a> {
             track_id: metadata.track_id(),
             track_number: metadata.track_number(),
             url: metadata.url(),
+            rest: metadata
+                .rest()
+                .iter()
+                .flat_map(|(key, value)| {
+                    if let Some(val) = MetadataValue::try_from(value) {
+                        Some((key.to_owned(), val))
+                    } else {
+                        None
+                    }
+                })
+                .collect(),
         }
     }
 }
