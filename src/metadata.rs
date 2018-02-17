@@ -19,14 +19,15 @@ enum Format {
 #[derive(Debug)]
 enum MetadataValue {
     String(String),
-    Int16(i16),
-    UInt16(u16),
-    Int32(i32),
-    UInt32(u32),
     Int64(i64),
-    UInt64(u64),
-    Double(f64),
-    Boolean(bool),
+    // Not yet supported due to limitations on dbus::arg::ArgRef :(
+    // Int16(i16),
+    // UInt16(u16),
+    // Int32(i32),
+    // UInt32(u32),
+    // UInt64(u64),
+    // Double(f64),
+    // Boolean(bool),
     Array(Vec<MetadataValue>),
 }
 
@@ -34,7 +35,10 @@ impl MetadataValue {
     fn try_from(arg: &RefArg) -> Option<MetadataValue> {
         match arg.arg_type() {
             ArgType::String => arg.as_str().map(|s| MetadataValue::String(String::from(s))),
-            _ => unimplemented!("Oh noes"),
+            ArgType::Int64 => arg.as_i64().map(|i| MetadataValue::Int64(i)),
+            ArgType::Array => arg.as_iter()
+                .map(|iter| MetadataValue::Array(iter.flat_map(MetadataValue::try_from).collect())),
+            _ => None,
         }
     }
 }
@@ -46,7 +50,15 @@ impl Serialize for MetadataValue {
     {
         match *self {
             MetadataValue::String(ref s) => serializer.serialize_str(s),
-            _ => unimplemented!(),
+            MetadataValue::Int64(ref i) => serializer.serialize_i64(*i),
+            MetadataValue::Array(ref arr) => {
+                use metadata::serde::ser::SerializeSeq;
+                let mut seq = serializer.serialize_seq(Some(arr.len()))?;
+                for item in arr.iter() {
+                    seq.serialize_element(item)?;
+                }
+                seq.end()
+            }
         }
     }
 }
