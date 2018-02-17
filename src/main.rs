@@ -10,9 +10,11 @@ use clap::{App, AppSettings, Arg, SubCommand};
 
 mod list;
 mod basic_command;
+mod metadata;
 
 use list::run as list;
 use basic_command::run as basic_command;
+use metadata::run as metadata;
 
 use mpris::{Player, PlayerFinder};
 
@@ -152,6 +154,21 @@ fn build_app<'a, 'b>() -> App<'a, 'b> {
         )
         .subcommand(SubCommand::with_name("next").about("Skip to next media"))
         .subcommand(SubCommand::with_name("previous").about("Go back to previous media"))
+        .subcommand(
+            SubCommand::with_name("metadata")
+                .about("Print metdata about the current media")
+                .arg(
+                    Arg::with_name("text")
+                        .long("text")
+                        .help("Print metadata in text format (default)"),
+                )
+                .arg(
+                    Arg::with_name("json")
+                        .long("json")
+                        .help("Print metadata as JSON")
+                        .overrides_with("text"),
+                ),
+        )
 }
 
 fn main() {
@@ -166,6 +183,7 @@ fn main() {
         ("toggle_pause", _) => basic_command("Play/Pause", Player::checked_play_pause, &settings),
         ("next", _) => basic_command("Next", Player::checked_next, &settings),
         ("previous", _) => basic_command("Previous", Player::checked_previous, &settings),
+        ("metadata", matches) => metadata(matches, &settings),
         (unknown, _) => panic!("Software bug: No subcommand is implemented for {}", unknown),
     };
 
