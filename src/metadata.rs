@@ -1,21 +1,25 @@
 extern crate mpris;
+extern crate serde_json;
 
 use std::fmt::Display;
 use super::{Error, Settings};
 use clap::ArgMatches;
 
+#[derive(Debug, PartialEq, Clone, Copy)]
 enum Format {
     Text,
     JSON,
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct MetadataView<'a> {
     album_artists: Option<&'a Vec<String>>,
-    album_artists_joined: Option<String>,
+    album_artists_string: Option<String>,
     album_name: Option<&'a str>,
     art_url: Option<&'a str>,
     artists: Option<&'a Vec<String>>,
-    artists_joined: Option<String>,
+    artists_string: Option<String>,
     auto_rating: Option<f64>,
     disc_number: Option<i32>,
     length_in_microseconds: Option<u64>,
@@ -31,11 +35,11 @@ impl<'a> From<&'a mpris::Metadata> for MetadataView<'a> {
     fn from(metadata: &'a mpris::Metadata) -> MetadataView<'a> {
         MetadataView {
             album_artists: metadata.album_artists(),
-            album_artists_joined: metadata.album_artists().map(|a| a.join(", ")),
+            album_artists_string: metadata.album_artists().map(|a| a.join(", ")),
             album_name: metadata.album_name(),
             art_url: metadata.art_url(),
             artists: metadata.artists(),
-            artists_joined: metadata.artists().map(|a| a.join(", ")),
+            artists_string: metadata.artists().map(|a| a.join(", ")),
             auto_rating: metadata.auto_rating(),
             disc_number: metadata.disc_number(),
             length_in_microseconds: metadata.length_in_microseconds(),
@@ -63,17 +67,23 @@ pub(crate) fn run(matches: Option<&ArgMatches>, settings: &Settings) -> Result<(
 
     match format {
         Format::Text => print_metadata(&metadata_view),
-        Format::JSON => unimplemented!("JSON output is not yet implemented"),
+        Format::JSON => match serde_json::to_string(&metadata_view) {
+            Ok(json) => {
+                println!("{}", json);
+                Ok(())
+            }
+            Err(error) => Err(Error::from(error)),
+        },
     }
 }
 
 fn print_metadata<'a>(view: &'a MetadataView<'a>) -> Result<(), Error> {
     print_text_field("Track ID", &Some(view.track_id));
     print_text_field("Title", &view.title);
-    print_text_field("Artists", &view.artists_joined);
+    print_text_field("Artists", &view.artists_string);
     print_text_field("Album", &view.album_name);
     print_text_field("Track number", &view.track_number);
-    print_text_field("Album artists", &view.album_artists_joined);
+    print_text_field("Album artists", &view.album_artists_string);
     print_text_field("Artwork URL", &view.art_url);
     print_text_field("Auto-rating", &view.auto_rating);
     print_text_field("Disc number", &view.disc_number);

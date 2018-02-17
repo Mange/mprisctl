@@ -1,5 +1,9 @@
 extern crate caseless;
 extern crate mpris;
+extern crate serde_json;
+
+#[macro_use]
+extern crate serde_derive;
 
 #[macro_use]
 extern crate failure;
@@ -108,11 +112,19 @@ pub enum Error {
     #[fail(display = "{}", _0)] DBusError(mpris::DBusError),
     #[fail(display = "Could not find any player")] AutomaticPlayerNotFound,
     #[fail(display = "Could not find any player with name \"{}\"", _0)] NamedPlayerNotFound(String),
+    #[fail(display = "Could not convert to JSON: {}", _0)]
+    JsonSerializationError(serde_json::Error),
 }
 
 impl From<mpris::DBusError> for Error {
     fn from(dbus_error: mpris::DBusError) -> Error {
         Error::DBusError(dbus_error)
+    }
+}
+
+impl From<serde_json::Error> for Error {
+    fn from(serde_error: serde_json::Error) -> Error {
+        Error::JsonSerializationError(serde_error)
     }
 }
 
