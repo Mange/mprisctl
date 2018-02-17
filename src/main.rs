@@ -162,7 +162,7 @@ fn build_app<'a, 'b>() -> App<'a, 'b> {
         .subcommand(SubCommand::with_name("play").about("Resume current media"))
         .subcommand(SubCommand::with_name("pause").about("Pause current media"))
         .subcommand(
-            SubCommand::with_name("toggle_pause").about("Pause if playing, or play if paused."),
+            SubCommand::with_name("toggle-pause").about("Pause if playing, or play if paused"),
         )
         .subcommand(SubCommand::with_name("next").about("Skip to next media"))
         .subcommand(SubCommand::with_name("previous").about("Go back to previous media"))
@@ -192,7 +192,7 @@ fn main() {
         ("list", _) => list(&settings),
         ("play", _) => basic_command("Play", Player::checked_play, &settings),
         ("pause", _) => basic_command("Pause", Player::checked_pause, &settings),
-        ("toggle_pause", _) => basic_command("Play/Pause", Player::checked_play_pause, &settings),
+        ("toggle-pause", _) => basic_command("Play/Pause", Player::checked_play_pause, &settings),
         ("next", _) => basic_command("Next", Player::checked_next, &settings),
         ("previous", _) => basic_command("Previous", Player::checked_previous, &settings),
         ("metadata", matches) => metadata(matches, &settings),
