@@ -131,10 +131,10 @@ impl From<serde_json::Error> for Error {
 fn build_app<'a, 'b>() -> App<'a, 'b> {
     app_from_crate!()
         .setting(AppSettings::SubcommandRequiredElseHelp)
-        .setting(AppSettings::ColoredHelp)
         .setting(AppSettings::GlobalVersion)
-        .setting(AppSettings::InferSubcommands)
-        .setting(AppSettings::VersionlessSubcommands)
+        .global_setting(AppSettings::InferSubcommands)
+        .global_setting(AppSettings::VersionlessSubcommands)
+        .global_setting(AppSettings::ColoredHelp)
         .arg(
             Arg::with_name("verbose")
                 .long("verbose")
