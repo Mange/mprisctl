@@ -120,12 +120,8 @@ pub(crate) fn run(matches: Option<&ArgMatches>, settings: &Settings) -> Result<(
     let metadata_view = MetadataView::from(&metadata);
 
     let format = match matches {
-        Some(matches) => if matches.is_present("json") {
-            Format::JSON
-        } else {
-            Format::Text
-        },
-        None => Format::Text,
+        Some(matches) if matches.is_present("json") => Format::JSON,
+        _ => Format::Text,
     };
 
     match format {
