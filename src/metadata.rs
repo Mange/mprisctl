@@ -76,14 +76,22 @@ struct MetadataView<'a> {
     disc_number: Option<i32>,
     length_in_microseconds: Option<u64>,
     length_in_seconds: Option<u64>,
+    loop_status: &'static str,
+    playback_rate: f64,
     playback_status: &'static str,
+    position_in_microseconds: u64,
+    position_in_seconds: u64,
     title: Option<&'a str>,
     track_id: &'a str,
     track_number: Option<i32>,
     url: Option<&'a str>,
+    volume: f64,
 
-    is_playing: bool,
+    is_looping_playlist: bool,
+    is_looping_track: bool,
     is_paused: bool,
+    is_playing: bool,
+    is_shuffled: bool,
     is_stopped: bool,
 
     rest: HashMap<String, MetadataValue>,
@@ -95,6 +103,7 @@ impl<'a> MetadataView<'a> {
         player: &'a mpris::Player,
     ) -> Result<MetadataView<'a>, mpris::DBusError> {
         use mpris::PlaybackStatus::*;
+        use mpris::LoopStatus;
 
         let playback_status = player.get_playback_status()?;
         let playback_status_str = match playback_status {
@@ -102,6 +111,22 @@ impl<'a> MetadataView<'a> {
             Paused => "Paused",
             Stopped => "Stopped",
         };
+
+        let loop_status = player.get_loop_status()?;
+        let loop_status_str = match loop_status {
+            LoopStatus::None => "None",
+            LoopStatus::Track => "Track",
+            LoopStatus::Playlist => "Playlist",
+        };
+
+        let position = player.get_position()?;
+        let position_in_microseconds =
+            position.as_secs() + position.subsec_nanos() as u64 * 1_000_000_000;
+        let position_in_seconds = position.as_secs();
+
+        let playback_rate = player.get_playback_rate()?;
+        let shuffled = player.get_shuffle()?;
+        let volume = player.get_volume()?;
 
         Ok(MetadataView {
             album_artists: metadata.album_artists(),
@@ -114,14 +139,24 @@ impl<'a> MetadataView<'a> {
             disc_number: metadata.disc_number(),
             length_in_microseconds: metadata.length_in_microseconds(),
             length_in_seconds: metadata.length_in_microseconds().map(|us| us / 1000 / 1000),
+            loop_status: loop_status_str,
+            playback_rate,
             playback_status: playback_status_str,
+            position_in_microseconds,
+            position_in_seconds,
             title: metadata.title(),
             track_id: metadata.track_id(),
             track_number: metadata.track_number(),
             url: metadata.url(),
+            volume,
+
+            is_looping_playlist: loop_status == LoopStatus::Playlist,
+            is_looping_track: loop_status == LoopStatus::Track,
             is_playing: playback_status == Playing,
+            is_shuffled: shuffled,
             is_paused: playback_status == Paused,
             is_stopped: playback_status == Stopped,
+
             rest: metadata
                 .rest()
                 .iter()
@@ -170,14 +205,20 @@ fn print_metadata<'a>(view: &'a MetadataView<'a>) -> Result<(), Error> {
     print_text_field("Artwork URL", &view.art_url);
     print_text_field("Auto-rating", &view.auto_rating);
     print_text_field("Disc number", &view.disc_number);
+    print_text_field("URL", &view.url);
     print_text_field("Length (µs)", &view.length_in_microseconds);
     print_text_field("Length (s)", &view.length_in_seconds);
-    print_text_field("URL", &view.url);
+    print_text_field("Playback rate", &Some(view.playback_rate));
+    print_text_field("Position (µs)", &Some(view.position_in_microseconds));
+    print_text_field("Position (s)", &Some(view.position_in_seconds));
+    print_text_field("Looping", &Some(view.loop_status));
+    print_text_field("Shuffled", &Some(view.is_shuffled));
+    print_text_field("Volume (unitless)", &Some(view.volume));
     Ok(())
 }
 
-// Length of longest text field text ("Playback status")
-const TEXT_FIELD_PADDING: usize = 15;
+// Length of longest text field text ("Volume (unitless)")
+const TEXT_FIELD_PADDING: usize = 17;
 
 fn print_text_field<T: Display>(title: &'static str, value: &Option<T>) {
     match *value {
