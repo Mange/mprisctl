@@ -15,10 +15,12 @@ use clap::{App, AppSettings, Arg, SubCommand};
 mod list;
 mod basic_command;
 mod metadata;
+mod format;
 
 use list::run as list;
 use basic_command::run as basic_command;
 use metadata::run as metadata;
+use format::run as format;
 
 use mpris::{Player, PlayerFinder};
 
@@ -114,6 +116,9 @@ pub enum Error {
     #[fail(display = "Could not find any player with name \"{}\"", _0)] NamedPlayerNotFound(String),
     #[fail(display = "Could not convert to JSON: {}", _0)]
     JsonSerializationError(serde_json::Error),
+    #[fail(display = "I/O error: {}", _0)] IOError(std::io::Error),
+    #[fail(display = "Template error: {}", _0)] TemplateError(String),
+    #[fail(display = "Could not render template: {}", _0)] RenderError(String),
 }
 
 impl From<mpris::DBusError> for Error {
@@ -125,6 +130,12 @@ impl From<mpris::DBusError> for Error {
 impl From<serde_json::Error> for Error {
     fn from(serde_error: serde_json::Error) -> Error {
         Error::JsonSerializationError(serde_error)
+    }
+}
+
+impl From<std::io::Error> for Error {
+    fn from(io_error: std::io::Error) -> Error {
+        Error::IOError(io_error)
     }
 }
 
@@ -181,6 +192,16 @@ fn build_app<'a, 'b>() -> App<'a, 'b> {
                         .overrides_with("text"),
                 ),
         )
+        .subcommand(
+            SubCommand::with_name("format")
+                .about("Custom format of player metadata")
+                .arg(
+                    Arg::with_name("format")
+                        .required(true)
+                        .help("Format string")
+                        .long_help(include_str!("format_help.txt")),
+                ),
+        )
 }
 
 fn main() {
@@ -196,6 +217,7 @@ fn main() {
         ("next", _) => basic_command("Next", Player::checked_next, &settings),
         ("previous", _) => basic_command("Previous", Player::checked_previous, &settings),
         ("metadata", matches) => metadata(matches, &settings),
+        ("format", matches) => format(matches, &settings),
         (unknown, _) => panic!("Software bug: No subcommand is implemented for {}", unknown),
     };
 

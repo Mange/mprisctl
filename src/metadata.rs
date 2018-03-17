@@ -17,7 +17,7 @@ enum Format {
 }
 
 #[derive(Debug)]
-enum MetadataValue {
+pub(crate) enum MetadataValue {
     String(String),
     Int64(i64),
     // Not yet supported due to limitations on dbus::arg::ArgRef :(
@@ -65,7 +65,7 @@ impl Serialize for MetadataValue {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct MetadataView<'a> {
+pub(crate) struct MetadataView<'a> {
     album_artists: Option<&'a Vec<String>>,
     album_artists_string: Option<String>,
     album_name: Option<&'a str>,
@@ -98,7 +98,7 @@ struct MetadataView<'a> {
 }
 
 impl<'a> MetadataView<'a> {
-    fn from_player(
+    pub(crate) fn from_player(
         metadata: &'a mpris::Metadata,
         player: &'a mpris::Player,
     ) -> Result<MetadataView<'a>, mpris::DBusError> {
