@@ -2,6 +2,7 @@ extern crate handlebars;
 
 mod or;
 mod join;
+mod time;
 
 use clap::ArgMatches;
 use super::{Error, Settings};
@@ -27,6 +28,7 @@ fn render_template(template: &str, metadata_view: &MetadataView) -> Result<Strin
     handlebars.register_escape_fn(no_escape);
     handlebars.register_helper("or", Box::new(or::helper));
     handlebars.register_helper("join", Box::new(join::helper));
+    handlebars.register_helper("time", Box::new(time::helper));
 
     handlebars
         .render_template(template, metadata_view)

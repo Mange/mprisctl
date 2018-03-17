@@ -149,6 +149,15 @@ In addition you can use a few helpers to change the formatting of these values.
       {{join " feat. " artists}}
       {{join " - " artistsString title albumName}}
 
+  - time
+    Render a time from a second duration, using either set width or dynamically
+    from current width. Width could be in minutes ("02:59") or hours
+    ("01:02:59").
+
+      {{time positionInSeconds}} renders dynamic width.
+      {{time positionInSeconds "hours"}} always render in full width.
+      {{time positionInSeconds lengthInSeconds}} render in same width as other value.
+
 Examples:
 
   "{{artistsString}} - {{title}}"
