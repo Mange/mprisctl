@@ -139,7 +139,10 @@ fields:
 
 In addition you can use a few helpers to change the formatting of these values.
 
-  - TODO
+  - or
+    Render the first non-null value. Also supports last-resort block syntax.
+      {{or artistsString albumArtistsString "Unknown artist"}}
+      {{#or title}}Unknown title from {{albumName}}{{/or}}
 
 Examples:
 
