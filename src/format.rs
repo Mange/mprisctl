@@ -2,7 +2,7 @@ extern crate handlebars;
 
 use clap::ArgMatches;
 use super::{Error, Settings};
-use self::handlebars::{Handlebars, RenderError, TemplateError, TemplateRenderError};
+use self::handlebars::{no_escape, Handlebars, RenderError, TemplateError, TemplateRenderError};
 use metadata::MetadataView;
 use std::borrow::Cow;
 
@@ -21,6 +21,7 @@ pub(crate) fn run(matches: Option<&ArgMatches>, settings: &Settings) -> Result<(
 fn render_template(template: &str, metadata_view: &MetadataView) -> Result<String, Error> {
     let mut handlebars = Handlebars::new();
     handlebars.set_strict_mode(true);
+    handlebars.register_escape_fn(no_escape);
 
     handlebars
         .render_template(template, metadata_view)
