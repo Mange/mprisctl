@@ -168,7 +168,7 @@ fn build_app<'a, 'b>() -> App<'a, 'b> {
         .subcommand(SubCommand::with_name("previous").about("Go back to previous media"))
         .subcommand(
             SubCommand::with_name("metadata")
-                .about("Print metdata about the current media")
+                .about("Print metadata about the current media")
                 .arg(
                     Arg::with_name("text")
                         .long("text")

@@ -76,16 +76,34 @@ struct MetadataView<'a> {
     disc_number: Option<i32>,
     length_in_microseconds: Option<u64>,
     length_in_seconds: Option<u64>,
+    playback_status: &'static str,
     title: Option<&'a str>,
     track_id: &'a str,
     track_number: Option<i32>,
     url: Option<&'a str>,
+
+    is_playing: bool,
+    is_paused: bool,
+    is_stopped: bool,
+
     rest: HashMap<String, MetadataValue>,
 }
 
-impl<'a> From<&'a mpris::Metadata> for MetadataView<'a> {
-    fn from(metadata: &'a mpris::Metadata) -> MetadataView<'a> {
-        MetadataView {
+impl<'a> MetadataView<'a> {
+    fn from_player(
+        metadata: &'a mpris::Metadata,
+        player: &'a mpris::Player,
+    ) -> Result<MetadataView<'a>, mpris::DBusError> {
+        use mpris::PlaybackStatus::*;
+
+        let playback_status = player.get_playback_status()?;
+        let playback_status_str = match playback_status {
+            Playing => "Playing",
+            Paused => "Paused",
+            Stopped => "Stopped",
+        };
+
+        Ok(MetadataView {
             album_artists: metadata.album_artists(),
             album_artists_string: metadata.album_artists().map(|a| a.join(", ")),
             album_name: metadata.album_name(),
@@ -96,10 +114,14 @@ impl<'a> From<&'a mpris::Metadata> for MetadataView<'a> {
             disc_number: metadata.disc_number(),
             length_in_microseconds: metadata.length_in_microseconds(),
             length_in_seconds: metadata.length_in_microseconds().map(|us| us / 1000 / 1000),
+            playback_status: playback_status_str,
             title: metadata.title(),
             track_id: metadata.track_id(),
             track_number: metadata.track_number(),
             url: metadata.url(),
+            is_playing: playback_status == Playing,
+            is_paused: playback_status == Paused,
+            is_stopped: playback_status == Stopped,
             rest: metadata
                 .rest()
                 .iter()
@@ -111,13 +133,14 @@ impl<'a> From<&'a mpris::Metadata> for MetadataView<'a> {
                     }
                 })
                 .collect(),
-        }
+        })
     }
 }
 
 pub(crate) fn run(matches: Option<&ArgMatches>, settings: &Settings) -> Result<(), Error> {
-    let metadata = settings.find_player()?.get_metadata()?;
-    let metadata_view = MetadataView::from(&metadata);
+    let player = settings.find_player()?;
+    let metadata = player.get_metadata()?;
+    let metadata_view = MetadataView::from_player(&metadata, &player)?;
 
     let format = match matches {
         Some(matches) if matches.is_present("json") => Format::JSON,
@@ -137,6 +160,7 @@ pub(crate) fn run(matches: Option<&ArgMatches>, settings: &Settings) -> Result<(
 }
 
 fn print_metadata<'a>(view: &'a MetadataView<'a>) -> Result<(), Error> {
+    print_text_field("Playback status", &Some(view.playback_status));
     print_text_field("Track ID", &Some(view.track_id));
     print_text_field("Title", &view.title);
     print_text_field("Artists", &view.artists_string);
@@ -152,8 +176,8 @@ fn print_metadata<'a>(view: &'a MetadataView<'a>) -> Result<(), Error> {
     Ok(())
 }
 
-// Length of longest text field text ("Album artists")
-const TEXT_FIELD_PADDING: usize = 13;
+// Length of longest text field text ("Playback status")
+const TEXT_FIELD_PADDING: usize = 15;
 
 fn print_text_field<T: Display>(title: &'static str, value: &Option<T>) {
     match *value {
