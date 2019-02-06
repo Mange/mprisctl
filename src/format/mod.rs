@@ -4,12 +4,12 @@ mod join;
 mod or;
 mod time;
 
-use structopt::StructOpt;
 use self::handlebars::{no_escape, Handlebars};
 use super::Settings;
 use failure::Error;
 use metadata::MetadataView;
 use mpris::Player;
+use structopt::StructOpt;
 
 #[derive(StructOpt, Debug)]
 pub struct Options {
@@ -18,12 +18,20 @@ pub struct Options {
     /// of metadata changes in the player.
     watch: bool,
 
-    #[structopt(short = "i", long = "watch-interval", value_name = "MILLISECONDS", default_value = "250")]
+    #[structopt(
+        short = "i",
+        long = "watch-interval",
+        value_name = "MILLISECONDS",
+        default_value = "250"
+    )]
     /// Rerender at close to this interval when watching. Shorter time means quicker updates, while
     /// longer time means less resource utilization.
     watch_interval: u32,
 
-    #[structopt(name = "FORMAT", raw(long_help = "include_str!(\"../format_help.txt\")"))]
+    #[structopt(
+        name = "FORMAT",
+        raw(long_help = "include_str!(\"../format_help.txt\")")
+    )]
     /// The format string. Full reference is available under the --help option.
     template: String,
 }
@@ -63,8 +71,8 @@ fn watch_player(player: Player, handlebars: Handlebars, interval: u32) -> Result
     let mut tracker = player.track_progress(interval)?;
     let mut last_output = String::new();
     loop {
-        let (progress, _) = tracker.tick();
-        let metadata_view = MetadataView::from_progress(progress)?;
+        let progress = tracker.tick();
+        let metadata_view = MetadataView::from_progress(progress.progress)?;
         let output = render_template(&handlebars, &metadata_view)?;
         if output != last_output {
             println!("{}", output);

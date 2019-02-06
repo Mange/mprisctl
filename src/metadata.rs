@@ -1,16 +1,13 @@
-extern crate dbus;
 extern crate mpris;
 extern crate serde;
 extern crate serde_json;
 
-use self::dbus::arg::{ArgType, RefArg};
-use self::serde::{Serialize, Serializer};
 use super::{Error, Settings};
 use std::collections::HashMap;
 use std::fmt::Display;
 use structopt::StructOpt;
 
-use mpris::{DBusError, LoopStatus, Metadata, PlaybackStatus, Player, Progress};
+use mpris::{DBusError, LoopStatus, Metadata, PlaybackStatus, Player, Progress, TrackID};
 
 #[derive(StructOpt, Debug)]
 pub struct Options {
@@ -48,62 +45,14 @@ impl std::str::FromStr for Format {
     }
 }
 
-#[derive(Debug)]
-pub(crate) enum MetadataValue {
-    String(String),
-    Int64(i64),
-    // Not yet supported due to limitations on dbus::arg::ArgRef :(
-    // Int16(i16),
-    // UInt16(u16),
-    // Int32(i32),
-    // UInt32(u32),
-    // UInt64(u64),
-    // Double(f64),
-    // Boolean(bool),
-    Array(Vec<MetadataValue>),
-}
-
-impl MetadataValue {
-    fn try_from(arg: &RefArg) -> Option<MetadataValue> {
-        match arg.arg_type() {
-            ArgType::String => arg.as_str().map(|s| MetadataValue::String(String::from(s))),
-            ArgType::Int64 => arg.as_i64().map(MetadataValue::Int64),
-            ArgType::Array => arg
-                .as_iter()
-                .map(|iter| MetadataValue::Array(iter.flat_map(MetadataValue::try_from).collect())),
-            _ => None,
-        }
-    }
-}
-
-impl Serialize for MetadataValue {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        match *self {
-            MetadataValue::String(ref s) => serializer.serialize_str(s),
-            MetadataValue::Int64(ref i) => serializer.serialize_i64(*i),
-            MetadataValue::Array(ref arr) => {
-                use metadata::serde::ser::SerializeSeq;
-                let mut seq = serializer.serialize_seq(Some(arr.len()))?;
-                for item in arr.iter() {
-                    seq.serialize_element(item)?;
-                }
-                seq.end()
-            }
-        }
-    }
-}
-
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct MetadataView<'a> {
-    album_artists: Option<&'a Vec<String>>,
+    album_artists: Option<Vec<&'a str>>,
     album_artists_string: Option<String>,
     album_name: Option<&'a str>,
     art_url: Option<&'a str>,
-    artists: Option<&'a Vec<String>>,
+    artists: Option<Vec<&'a str>>,
     artists_string: Option<String>,
     auto_rating: Option<f64>,
     disc_number: Option<i32>,
@@ -115,7 +64,7 @@ pub(crate) struct MetadataView<'a> {
     position_in_microseconds: u64,
     position_in_seconds: u64,
     title: Option<&'a str>,
-    track_id: &'a str,
+    track_id: Option<String>,
     track_number: Option<i32>,
     url: Option<&'a str>,
     volume: f64,
@@ -127,7 +76,7 @@ pub(crate) struct MetadataView<'a> {
     is_shuffled: bool,
     is_stopped: bool,
 
-    rest: HashMap<String, MetadataValue>,
+    raw: HashMap<String, serde_json::Value>,
 }
 
 fn playback_status_str(playback_status: PlaybackStatus) -> &'static str {
@@ -148,7 +97,7 @@ fn loop_status_str(loop_status: LoopStatus) -> &'static str {
     }
 }
 
-fn join_option_string(list: Option<&Vec<String>>) -> Option<String> {
+fn join_option_string(list: Option<Vec<&str>>) -> Option<String> {
     list.map(|a| a.join(", "))
 }
 
@@ -188,7 +137,7 @@ impl<'a> MetadataView<'a> {
             position_in_microseconds,
             position_in_seconds,
             title: metadata.title(),
-            track_id: metadata.track_id(),
+            track_id: metadata.track_id().map(TrackID::into),
             track_number: metadata.track_number(),
             url: metadata.url(),
             volume: player.get_volume()?,
@@ -200,17 +149,7 @@ impl<'a> MetadataView<'a> {
             is_paused: playback_status == PlaybackStatus::Paused,
             is_stopped: playback_status == PlaybackStatus::Stopped,
 
-            rest: metadata
-                .rest()
-                .iter()
-                .flat_map(|(key, value)| {
-                    if let Some(val) = MetadataValue::try_from(value) {
-                        Some((key.to_owned(), val))
-                    } else {
-                        None
-                    }
-                })
-                .collect(),
+            raw: HashMap::new(), // TODO: mpris does not allow us to read this without consuming the entire Metadata.
         })
     }
 
@@ -245,7 +184,7 @@ impl<'a> MetadataView<'a> {
             position_in_microseconds,
             position_in_seconds,
             title: metadata.title(),
-            track_id: metadata.track_id(),
+            track_id: metadata.track_id().map(TrackID::into),
             track_number: metadata.track_number(),
             url: metadata.url(),
             volume: progress.current_volume(),
@@ -257,17 +196,7 @@ impl<'a> MetadataView<'a> {
             is_paused: playback_status == PlaybackStatus::Paused,
             is_stopped: playback_status == PlaybackStatus::Stopped,
 
-            rest: metadata
-                .rest()
-                .iter()
-                .flat_map(|(key, value)| {
-                    if let Some(val) = MetadataValue::try_from(value) {
-                        Some((key.to_owned(), val))
-                    } else {
-                        None
-                    }
-                })
-                .collect(),
+            raw: HashMap::new(), // TODO: mpris does not allow us to read this without consuming the entire Metadata.
         })
     }
 }
@@ -291,7 +220,7 @@ pub(crate) fn run(options: &Options, settings: &Settings) -> Result<(), Error> {
 
 fn print_metadata<'a>(view: &'a MetadataView<'a>) -> Result<(), Error> {
     print_text_field("Playback status", &Some(view.playback_status));
-    print_text_field("Track ID", &Some(view.track_id));
+    print_text_field("Track ID", &view.track_id);
     print_text_field("Title", &view.title);
     print_text_field("Artists", &view.artists_string);
     print_text_field("Album", &view.album_name);
