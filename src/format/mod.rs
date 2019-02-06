@@ -7,7 +7,7 @@ mod time;
 use self::handlebars::{no_escape, Handlebars};
 use super::Settings;
 use failure::Error;
-use metadata::MetadataView;
+use crate::metadata::MetadataView;
 use mpris::Player;
 use structopt::StructOpt;
 

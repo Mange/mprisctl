@@ -3,6 +3,7 @@ name = "mprisctl"
 description = "CLI tool to control media players using the MPRIS2 protocol"
 version = "0.1.0"
 authors = ["Magnus Bergmark <magnus.bergmark@gmail.com>"]
+edition = "2018"
 
 [dependencies]
 mpris = "2.0.0-rc1"

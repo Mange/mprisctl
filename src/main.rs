@@ -22,10 +22,10 @@ mod format;
 mod list;
 mod metadata;
 
-use basic_command::run as basic_command;
-use format::run as format;
-use list::run as list;
-use metadata::run as metadata;
+use crate::basic_command::run as basic_command;
+use crate::format::run as format;
+use crate::list::run as list;
+use crate::metadata::run as metadata;
 
 use mpris::{Player, PlayerFinder};
 
