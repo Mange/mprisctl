@@ -11,22 +11,22 @@ extern crate serde_json;
 #[macro_use]
 extern crate serde_derive;
 
-#[macro_use]
 extern crate failure;
+use failure::{Error, format_err};
 
 #[macro_use]
 extern crate clap;
 use clap::{App, AppSettings, Arg, SubCommand};
 
-mod list;
 mod basic_command;
-mod metadata;
 mod format;
+mod list;
+mod metadata;
 
-use list::run as list;
 use basic_command::run as basic_command;
-use metadata::run as metadata;
 use format::run as format;
+use list::run as list;
+use metadata::run as metadata;
 
 use mpris::{Player, PlayerFinder};
 
@@ -93,12 +93,12 @@ impl Settings {
             PlayerSelection::Automatic => match finder.find_active() {
                 Ok(player) => Ok(player),
                 Err(FindingError::DBusError(err)) => Err(err.into()),
-                Err(FindingError::NoPlayerFound) => Err(Error::AutomaticPlayerNotFound),
+                Err(FindingError::NoPlayerFound) => Err(format_err!("Could not find any player")),
             },
             PlayerSelection::WithName(ref name) => match finder.find_all() {
                 Ok(players) => find_player_with_name(players, name),
                 Err(FindingError::DBusError(err)) => Err(err.into()),
-                Err(FindingError::NoPlayerFound) => Err(Error::NamedPlayerNotFound(name.clone())),
+                Err(FindingError::NoPlayerFound) => Err(format_err!("Could not find any player with name \"{}\"", name)),
             },
         }
     }
@@ -111,37 +111,7 @@ fn find_player_with_name<'a>(players: Vec<Player<'a>>, name: &str) -> Result<Pla
 
     match found_player {
         Some(player) => Ok(player),
-        None => Err(Error::NamedPlayerNotFound(String::from(name))),
-    }
-}
-
-#[derive(Debug, Fail)]
-pub enum Error {
-    #[fail(display = "{}", _0)] DBusError(mpris::DBusError),
-    #[fail(display = "Could not find any player")] AutomaticPlayerNotFound,
-    #[fail(display = "Could not find any player with name \"{}\"", _0)] NamedPlayerNotFound(String),
-    #[fail(display = "Could not convert to JSON: {}", _0)]
-    JsonSerializationError(serde_json::Error),
-    #[fail(display = "I/O error: {}", _0)] IOError(std::io::Error),
-    #[fail(display = "Template error: {}", _0)] TemplateError(String),
-    #[fail(display = "Could not render template: {}", _0)] RenderError(String),
-}
-
-impl From<mpris::DBusError> for Error {
-    fn from(dbus_error: mpris::DBusError) -> Error {
-        Error::DBusError(dbus_error)
-    }
-}
-
-impl From<serde_json::Error> for Error {
-    fn from(serde_error: serde_json::Error) -> Error {
-        Error::JsonSerializationError(serde_error)
-    }
-}
-
-impl From<std::io::Error> for Error {
-    fn from(io_error: std::io::Error) -> Error {
-        Error::IOError(io_error)
+        None => Err(format_err!("Could not find any player with name \"{}\"", name)),
     }
 }
 
@@ -246,12 +216,12 @@ fn main() {
         (unknown, _) => panic!("Software bug: No subcommand is implemented for {}", unknown),
     };
 
-    match result {
-        Ok(()) => { /* :-) */ }
-        Err(error) => {
-            eprintln!("{}", error);
-            ::std::process::exit(1);
+    if let Err(error) = result {
+        eprintln!("{}", error);
+        for cause in error.iter_causes() {
+            eprintln!("\nCaused by {}", cause);
         }
+        ::std::process::exit(1);
     }
 }
 

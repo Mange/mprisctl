@@ -4,11 +4,11 @@ mod join;
 mod or;
 mod time;
 
+use self::handlebars::{no_escape, Handlebars};
+use super::Settings;
 use clap::ArgMatches;
-use super::{Error, Settings};
-use self::handlebars::{no_escape, Handlebars, RenderError, TemplateError, TemplateRenderError};
+use failure::Error;
 use metadata::MetadataView;
-use std::borrow::Cow;
 use mpris::Player;
 
 pub const DEFAULT_INTERVAL_MS: u32 = 250;
@@ -72,43 +72,4 @@ fn render_template(handlebars: &Handlebars, metadata_view: &MetadataView) -> Res
     handlebars
         .render("main", metadata_view)
         .map_err(|e| e.into())
-}
-
-impl From<TemplateRenderError> for Error {
-    fn from(template_error: TemplateRenderError) -> Error {
-        match template_error {
-            TemplateRenderError::TemplateError(error) => error.into(),
-            TemplateRenderError::RenderError(error) => error.into(),
-            TemplateRenderError::IOError(error, _) => error.into(),
-        }
-    }
-}
-
-impl From<TemplateError> for Error {
-    fn from(template_error: TemplateError) -> Error {
-        Error::TemplateError(format!(
-            "{message}\n(at line {line}, column {column})",
-            message = template_error.reason,
-            line = option_usize_to_string(template_error.line_no),
-            column = option_usize_to_string(template_error.column_no)
-        ))
-    }
-}
-
-impl From<RenderError> for Error {
-    fn from(render_error: RenderError) -> Error {
-        Error::RenderError(format!(
-            "{message}\n(at line {line}, column {column})",
-            message = render_error.desc,
-            line = option_usize_to_string(render_error.line_no),
-            column = option_usize_to_string(render_error.column_no)
-        ))
-    }
-}
-
-fn option_usize_to_string<'a>(n: Option<usize>) -> Cow<'a, str> {
-    match n {
-        Some(num) => Cow::Owned(num.to_string()),
-        None => Cow::Borrowed("?"),
-    }
 }
