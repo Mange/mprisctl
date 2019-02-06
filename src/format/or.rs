@@ -1,12 +1,14 @@
 use super::handlebars::*;
 
-pub(crate) fn helper(
-    h: &Helper,
-    registry: &Handlebars,
-    rc: &mut RenderContext,
+pub(crate) fn helper<'reg, 'rc>(
+    h: &Helper<'reg, 'rc>,
+    registry: &'reg Handlebars,
+    ctx: &Context,
+    rc: &mut RenderContext<'reg>,
     out: &mut Output,
 ) -> HelperResult {
-    let first_value = h.params()
+    let first_value = h
+        .params()
         .iter()
         .map(|param| param.value())
         .find(|value| !value.is_null());
@@ -14,7 +16,7 @@ pub(crate) fn helper(
         out.write(value.render().as_ref())?;
     } else {
         if let Some(template) = h.template() {
-            template.render(registry, rc, out)?;
+            template.render(registry, ctx, rc, out)?;
         }
     }
     Ok(())

@@ -4,6 +4,7 @@ use serde_json::Value;
 pub(crate) fn helper(
     h: &Helper,
     _: &Handlebars,
+    _: &Context,
     _: &mut RenderContext,
     out: &mut Output,
 ) -> HelperResult {
