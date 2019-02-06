@@ -202,6 +202,25 @@ fn build_app<'a, 'b>() -> App<'a, 'b> {
             SubCommand::with_name("format")
                 .about("Custom format of player metadata")
                 .arg(
+                    Arg::with_name("watch")
+                    .short("w")
+                    .long("watch")
+                    .help("Keep running, outputting the template every time any metadata changes")
+                )
+                .arg(
+                    Arg::with_name("watch-interval")
+                    .short("i")
+                    .long("watch-interval")
+                    .takes_value(true)
+                    .value_name("MILLISECONDS")
+                    .default_value(&format::DEFAULT_INTERVAL_MS_STR)
+                    .help("Rerender at around this rate when watching.")
+                    .long_help(
+                        "Rerender at around this rate when watching. This is useful to control how
+                        well position should update, as real metadata changes should be rendered
+                        almost instantly.")
+                )
+                .arg(
                     Arg::with_name("format")
                         .required(true)
                         .help("Format string")

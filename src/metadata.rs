@@ -10,6 +10,8 @@ use clap::ArgMatches;
 use self::dbus::arg::{ArgType, RefArg};
 use self::serde::{Serialize, Serializer};
 
+use mpris::{DBusError, LoopStatus, Metadata, PlaybackStatus, Player, Progress};
+
 #[derive(Debug, PartialEq, Clone, Copy)]
 enum Format {
     Text,
@@ -97,27 +99,38 @@ pub(crate) struct MetadataView<'a> {
     rest: HashMap<String, MetadataValue>,
 }
 
+fn playback_status_str(playback_status: PlaybackStatus) -> &'static str {
+    use self::PlaybackStatus::*;
+
+    match playback_status {
+        Playing => "Playing",
+        Paused => "Paused",
+        Stopped => "Stopped",
+    }
+}
+
+fn loop_status_str(loop_status: LoopStatus) -> &'static str {
+    match loop_status {
+        LoopStatus::None => "None",
+        LoopStatus::Track => "Track",
+        LoopStatus::Playlist => "Playlist",
+    }
+}
+
+fn join_option_string(list: Option<&Vec<String>>) -> Option<String> {
+    list.map(|a| a.join(", "))
+}
+
 impl<'a> MetadataView<'a> {
     pub(crate) fn from_player(
-        metadata: &'a mpris::Metadata,
-        player: &'a mpris::Player,
-    ) -> Result<MetadataView<'a>, mpris::DBusError> {
-        use mpris::PlaybackStatus::*;
-        use mpris::LoopStatus;
-
+        metadata: &'a Metadata,
+        player: &'a Player,
+    ) -> Result<MetadataView<'a>, DBusError> {
         let playback_status = player.get_playback_status()?;
-        let playback_status_str = match playback_status {
-            Playing => "Playing",
-            Paused => "Paused",
-            Stopped => "Stopped",
-        };
+        let playback_status_str = playback_status_str(playback_status);
 
         let loop_status = player.get_loop_status()?;
-        let loop_status_str = match loop_status {
-            LoopStatus::None => "None",
-            LoopStatus::Track => "Track",
-            LoopStatus::Playlist => "Playlist",
-        };
+        let loop_status_str = loop_status_str(loop_status);
 
         let position = player.get_position()?;
         let position_in_microseconds =
@@ -126,15 +139,14 @@ impl<'a> MetadataView<'a> {
 
         let playback_rate = player.get_playback_rate()?;
         let shuffled = player.get_shuffle()?;
-        let volume = player.get_volume()?;
 
         Ok(MetadataView {
             album_artists: metadata.album_artists(),
-            album_artists_string: metadata.album_artists().map(|a| a.join(", ")),
+            album_artists_string: join_option_string(metadata.album_artists()),
             album_name: metadata.album_name(),
             art_url: metadata.art_url(),
             artists: metadata.artists(),
-            artists_string: metadata.artists().map(|a| a.join(", ")),
+            artists_string: join_option_string(metadata.artists()),
             auto_rating: metadata.auto_rating(),
             disc_number: metadata.disc_number(),
             length_in_microseconds: metadata.length_in_microseconds(),
@@ -148,14 +160,71 @@ impl<'a> MetadataView<'a> {
             track_id: metadata.track_id(),
             track_number: metadata.track_number(),
             url: metadata.url(),
-            volume,
+            volume: player.get_volume()?,
 
             is_looping_playlist: loop_status == LoopStatus::Playlist,
             is_looping_track: loop_status == LoopStatus::Track,
-            is_playing: playback_status == Playing,
+            is_playing: playback_status == PlaybackStatus::Playing,
             is_shuffled: shuffled,
-            is_paused: playback_status == Paused,
-            is_stopped: playback_status == Stopped,
+            is_paused: playback_status == PlaybackStatus::Paused,
+            is_stopped: playback_status == PlaybackStatus::Stopped,
+
+            rest: metadata
+                .rest()
+                .iter()
+                .flat_map(|(key, value)| {
+                    if let Some(val) = MetadataValue::try_from(value) {
+                        Some((key.to_owned(), val))
+                    } else {
+                        None
+                    }
+                })
+                .collect(),
+        })
+    }
+
+    pub(crate) fn from_progress(progress: &'a Progress) -> Result<MetadataView<'a>, DBusError> {
+        let playback_status = progress.playback_status();
+        let playback_status_str = playback_status_str(playback_status);
+
+        let loop_status = progress.loop_status();
+        let loop_status_str = loop_status_str(loop_status);
+
+        let position = progress.position();
+        let position_in_microseconds =
+            position.as_secs() + position.subsec_nanos() as u64 * 1_000_000_000;
+        let position_in_seconds = position.as_secs();
+
+        let metadata = progress.metadata();
+
+        Ok(MetadataView {
+            album_artists: metadata.album_artists(),
+            album_artists_string: join_option_string(metadata.album_artists()),
+            album_name: metadata.album_name(),
+            art_url: metadata.art_url(),
+            artists: metadata.artists(),
+            artists_string: join_option_string(metadata.artists()),
+            auto_rating: metadata.auto_rating(),
+            disc_number: metadata.disc_number(),
+            length_in_microseconds: metadata.length_in_microseconds(),
+            length_in_seconds: metadata.length_in_microseconds().map(|us| us / 1000 / 1000),
+            loop_status: loop_status_str,
+            playback_rate: 1.0, // TODO
+            playback_status: playback_status_str,
+            position_in_microseconds,
+            position_in_seconds,
+            title: metadata.title(),
+            track_id: metadata.track_id(),
+            track_number: metadata.track_number(),
+            url: metadata.url(),
+            volume: progress.current_volume(),
+
+            is_looping_playlist: loop_status == LoopStatus::Playlist,
+            is_looping_track: loop_status == LoopStatus::Track,
+            is_playing: playback_status == PlaybackStatus::Playing,
+            is_shuffled: progress.shuffle(),
+            is_paused: playback_status == PlaybackStatus::Paused,
+            is_stopped: playback_status == PlaybackStatus::Stopped,
 
             rest: metadata
                 .rest()
