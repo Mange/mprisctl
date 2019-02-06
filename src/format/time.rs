@@ -34,13 +34,13 @@ enum Width {
 
 fn width_of_value(val: &Value) -> Width {
     match val {
-        &Value::Number(ref num) => match num.as_u64() {
+        Value::Number(ref num) => match num.as_u64() {
             Some(0...HOUR) => Width::Minute,
             Some(HOUR...u64_max) => Width::Hour,
             _ => Width::Invalid,
         },
-        &Value::String(ref s) if s == "hour" => Width::Hour,
-        &Value::String(ref s) if s == "minute" => Width::Minute,
+        Value::String(ref s) if s == "hour" => Width::Hour,
+        Value::String(ref s) if s == "minute" => Width::Minute,
         _ => Width::Invalid,
     }
 }

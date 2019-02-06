@@ -114,7 +114,7 @@ impl<'a> MetadataView<'a> {
 
         let position = player.get_position()?;
         let position_in_microseconds =
-            position.as_secs() + position.subsec_nanos() as u64 * 1_000_000_000;
+            position.as_secs() + u64::from(position.subsec_nanos()) * 1_000_000_000;
         let position_in_seconds = position.as_secs();
 
         let playback_rate = player.get_playback_rate()?;
@@ -162,7 +162,7 @@ impl<'a> MetadataView<'a> {
 
         let position = progress.position();
         let position_in_microseconds =
-            position.as_secs() + position.subsec_nanos() as u64 * 1_000_000_000;
+            position.as_secs() + u64::from(position.subsec_nanos()) * 1_000_000_000;
         let position_in_seconds = position.as_secs();
 
         let metadata = progress.metadata();

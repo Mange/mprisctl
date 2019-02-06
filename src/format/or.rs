@@ -14,10 +14,8 @@ pub(crate) fn helper<'reg, 'rc>(
         .find(|value| !value.is_null());
     if let Some(value) = first_value {
         out.write(value.render().as_ref())?;
-    } else {
-        if let Some(template) = h.template() {
-            template.render(registry, ctx, rc, out)?;
-        }
+    } else if let Some(template) = h.template() {
+        template.render(registry, ctx, rc, out)?;
     }
     Ok(())
 }

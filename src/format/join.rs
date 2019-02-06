@@ -15,7 +15,7 @@ pub(crate) fn helper(
             .iter()
             .map(|param| param.value())
             .flat_map(|value| match value {
-                &Value::Array(ref array) => array.clone(),
+                Value::Array(ref array) => array.clone(),
                 _ => vec![value.clone()],
             })
             .filter(|value| !value.is_null())
