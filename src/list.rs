@@ -14,21 +14,18 @@ pub(crate) fn run(settings: &Settings) -> Result<(), Error> {
     };
 
     if players.is_empty() {
-        match settings.verbosity {
-            Verbosity::Normal | Verbosity::Quiet => {}
-            Verbosity::Verbose => {
-                eprintln!("No players found.");
-            }
+        if settings.verbose {
+            eprintln!("No players found.");
         }
         return Ok(());
     }
 
-    if settings.verbosity == Verbosity::Verbose {
+    if settings.verbose {
         eprintln!("Found players:");
     }
 
     for player in &players {
-        match settings.verbosity {
+        match settings.verbosity() {
             Verbosity::Normal | Verbosity::Quiet => {
                 println!("{}", player.identity());
             }

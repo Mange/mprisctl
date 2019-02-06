@@ -14,9 +14,8 @@ extern crate serde_derive;
 extern crate failure;
 use failure::{Error, format_err};
 
-#[macro_use]
-extern crate clap;
-use clap::{App, AppSettings, Arg, SubCommand};
+extern crate structopt;
+use structopt::StructOpt;
 
 mod basic_command;
 mod format;
@@ -55,41 +54,83 @@ impl Default for PlayerSelection {
     }
 }
 
-#[derive(Debug, Default)]
-struct Settings {
-    pub verbosity: Verbosity,
-    pub player_selection: PlayerSelection,
+#[derive(Debug, StructOpt)]
+#[structopt(
+    rename_all = "kebab-case",
+)]
+enum Command {
+    /// List running players
+    List,
+
+    /// Resume current media
+    Play,
+
+    /// Pause current media
+    Pause,
+
+    /// Pause if playing, or play if paused
+    TogglePause,
+
+    /// Skip to next media
+    Next,
+
+    /// Go back to start of media, or go to previous media
+    Previous,
+
+    /// Print metadata about the current media
+    Metadata(metadata::Options),
+
+    /// Print custom format of metadata about the current media
+    Format(format::Options),
 }
 
-impl<'a> From<&'a clap::ArgMatches<'a>> for Settings {
-    fn from(matches: &'a clap::ArgMatches) -> Settings {
-        let verbosity = if matches.is_present("quiet") {
-            Verbosity::Quiet
-        } else if matches.is_present("verbose") {
-            Verbosity::Verbose
-        } else {
-            Verbosity::Normal
-        };
+use structopt::clap::AppSettings;
+#[derive(Debug, StructOpt)]
+#[structopt(
+    raw(
+        setting = "AppSettings::SubcommandRequiredElseHelp",
+        setting = "AppSettings::GlobalVersion",
+        global_settings = "&[AppSettings::ColoredHelp, AppSettings::VersionlessSubcommands, AppSettings::InferSubcommands]",
+    )
+)]
+struct Settings {
+    #[structopt(short = "v", long = "verbose", conflicts_with = "quiet", raw(global = "true"))]
+    /// Turns on verbose output.
+    pub verbose: bool,
 
-        let player_selection = if let Some(player_name) = matches.value_of("player") {
-            PlayerSelection::WithName(String::from(player_name))
-        } else {
-            PlayerSelection::Automatic
-        };
+    /// Output as little as possible.
+    #[structopt(short = "q", long = "quiet", conflicts_with = "verbose", raw(global = "true"))]
+    pub quiet: bool,
 
-        Settings {
-            player_selection: player_selection,
-            verbosity: verbosity,
-        }
-    }
+    /// Control the player with the given name. If no player is selected then the first player
+    /// found will be controlled.
+    #[structopt(short = "p", long = "player", value_name = "NAME", raw(global = "true"))]
+    pub player_name: Option<String>,
+
+    #[structopt(subcommand)]
+    pub command: Command,
 }
 
 impl Settings {
+    fn verbosity(&self) -> Verbosity {
+        if self.quiet {
+            Verbosity::Quiet
+        } else if self.verbose {
+            Verbosity::Verbose
+        } else {
+            Verbosity::Normal
+        }
+    }
+
+    fn player_selection(&self) -> PlayerSelection {
+        self.player_name.as_ref().map(|name| PlayerSelection::WithName(name.to_string())).unwrap_or_default()
+    }
+
     fn find_player<'p>(&self) -> Result<Player<'p>, Error> {
         use mpris::FindingError;
         let finder = PlayerFinder::new()?;
 
-        match self.player_selection {
+        match self.player_selection() {
             PlayerSelection::Automatic => match finder.find_active() {
                 Ok(player) => Ok(player),
                 Err(FindingError::DBusError(err)) => Err(err.into()),
@@ -115,105 +156,18 @@ fn find_player_with_name<'a>(players: Vec<Player<'a>>, name: &str) -> Result<Pla
     }
 }
 
-fn build_app<'a, 'b>() -> App<'a, 'b> {
-    app_from_crate!()
-        .setting(AppSettings::SubcommandRequiredElseHelp)
-        .setting(AppSettings::GlobalVersion)
-        .global_setting(AppSettings::InferSubcommands)
-        .global_setting(AppSettings::VersionlessSubcommands)
-        .global_setting(AppSettings::ColoredHelp)
-        .arg(
-            Arg::with_name("verbose")
-                .long("verbose")
-                .short("v")
-                .help("Turns on verbose output")
-                .overrides_with("quiet")
-                .global(true),
-        )
-        .arg(
-            Arg::with_name("player")
-                .long("player")
-                .short("p")
-                .value_name("NAME")
-                .help("Tries to control player with given name")
-                .global(true),
-        )
-        .arg(
-            Arg::with_name("quiet")
-                .long("quiet")
-                .short("q")
-                .help("Output as little as possible")
-                .global(true),
-        )
-        .subcommand(SubCommand::with_name("list").about("List running players"))
-        .subcommand(SubCommand::with_name("play").about("Resume current media"))
-        .subcommand(SubCommand::with_name("pause").about("Pause current media"))
-        .subcommand(
-            SubCommand::with_name("toggle-pause").about("Pause if playing, or play if paused"),
-        )
-        .subcommand(SubCommand::with_name("next").about("Skip to next media"))
-        .subcommand(SubCommand::with_name("previous").about("Go back to previous media"))
-        .subcommand(
-            SubCommand::with_name("metadata")
-                .about("Print metadata about the current media")
-                .arg(
-                    Arg::with_name("text")
-                        .long("text")
-                        .help("Print metadata in text format (default)"),
-                )
-                .arg(
-                    Arg::with_name("json")
-                        .long("json")
-                        .help("Print metadata as JSON")
-                        .overrides_with("text"),
-                ),
-        )
-        .subcommand(
-            SubCommand::with_name("format")
-                .about("Custom format of player metadata")
-                .arg(
-                    Arg::with_name("watch")
-                    .short("w")
-                    .long("watch")
-                    .help("Keep running, outputting the template every time any metadata changes")
-                )
-                .arg(
-                    Arg::with_name("watch-interval")
-                    .short("i")
-                    .long("watch-interval")
-                    .takes_value(true)
-                    .value_name("MILLISECONDS")
-                    .default_value(&format::DEFAULT_INTERVAL_MS_STR)
-                    .help("Rerender at around this rate when watching.")
-                    .long_help(
-                        "Rerender at around this rate when watching. This is useful to control how
-                        well position should update, as real metadata changes should be rendered
-                        almost instantly.")
-                )
-                .arg(
-                    Arg::with_name("format")
-                        .required(true)
-                        .help("Format string")
-                        .long_help(include_str!("format_help.txt")),
-                ),
-        )
-}
-
 fn main() {
-    let app = build_app();
-    let matches = app.get_matches();
-    let settings = Settings::from(&matches);
+    let settings = Settings::from_args();
 
-    let result = match matches.subcommand() {
-        ("list", _) => list(&settings),
-        ("play", _) => basic_command("Play", Player::checked_play, &settings),
-        ("pause", _) => basic_command("Pause", Player::checked_pause, &settings),
-        ("toggle-pause", _) => basic_command("Play/Pause", Player::checked_play_pause, &settings),
-        ("next", _) => basic_command("Next", Player::checked_next, &settings),
-        ("previous", _) => basic_command("Previous", Player::checked_previous, &settings),
-        ("metadata", matches) => metadata(matches, &settings),
-        ("format", matches) => format(matches, &settings),
-        (unknown, _) => panic!("Software bug: No subcommand is implemented for {}", unknown),
+    let result = match settings.command {
+        Command::List => list(&settings),
+        Command::Play => basic_command("Play", Player::checked_play, &settings),
+        Command::Pause => basic_command("Pause", Player::checked_pause, &settings),
+        Command::TogglePause => basic_command("Play/Pause", Player::checked_play_pause, &settings),
+        Command::Next => basic_command("Next", Player::checked_next, &settings),
+        Command::Previous => basic_command("Previous", Player::checked_previous, &settings),
+        Command::Metadata(ref options) => metadata(options, &settings),
+        Command::Format(ref options) => format(options, &settings),
     };
 
     if let Err(error) = result {
@@ -233,38 +187,38 @@ mod tests {
         use super::*;
 
         fn settings_from(args: Vec<&'static str>) -> Settings {
-            Settings::from(&build_app().get_matches_from(args))
+            Settings::from_iter(args.iter())
         }
 
         #[test]
         fn it_sets_verbosity() {
             let settings = settings_from(vec!["x", "play"]);
-            assert_eq!(settings.verbosity, Verbosity::Normal);
+            assert_eq!(settings.verbosity(), Verbosity::Normal);
 
             let settings = settings_from(vec!["x", "play", "-v"]);
-            assert_eq!(settings.verbosity, Verbosity::Verbose);
+            assert_eq!(settings.verbosity(), Verbosity::Verbose);
 
             let settings = settings_from(vec!["x", "play", "--quiet"]);
-            assert_eq!(settings.verbosity, Verbosity::Quiet);
+            assert_eq!(settings.verbosity(), Verbosity::Quiet);
 
             let settings = settings_from(vec!["x", "--verbose", "play", "-q"]);
-            assert_eq!(settings.verbosity, Verbosity::Quiet);
+            assert_eq!(settings.verbosity(), Verbosity::Quiet);
         }
 
         #[test]
         fn it_sets_player_selection() {
             let settings = settings_from(vec!["x", "play"]);
-            assert_eq!(settings.player_selection, PlayerSelection::Automatic);
+            assert_eq!(settings.player_selection(), PlayerSelection::Automatic);
 
             let settings = settings_from(vec!["x", "-p", "vlc", "play"]);
             assert_eq!(
-                settings.player_selection,
+                settings.player_selection(),
                 PlayerSelection::WithName(String::from("vlc"))
             );
 
             let settings = settings_from(vec!["x", "play", "-p", "spotify"]);
             assert_eq!(
-                settings.player_selection,
+                settings.player_selection(),
                 PlayerSelection::WithName(String::from("spotify"))
             );
         }

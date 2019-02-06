@@ -4,32 +4,37 @@ mod join;
 mod or;
 mod time;
 
+use structopt::StructOpt;
 use self::handlebars::{no_escape, Handlebars};
 use super::Settings;
-use clap::ArgMatches;
 use failure::Error;
 use metadata::MetadataView;
 use mpris::Player;
 
-pub const DEFAULT_INTERVAL_MS: u32 = 250;
-pub const DEFAULT_INTERVAL_MS_STR: &str = "250";
+#[derive(StructOpt, Debug)]
+pub struct Options {
+    #[structopt(short = "w", long = "watch")]
+    /// Keep running, outputting the template every time the rendered template is different because
+    /// of metadata changes in the player.
+    watch: bool,
 
-pub(crate) fn run(matches: Option<&ArgMatches>, settings: &Settings) -> Result<(), Error> {
-    let matches = matches.unwrap();
-    let template = matches.value_of("format").unwrap(); // Field marked as required in arglist
-    let watch = matches.is_present("watch");
+    #[structopt(short = "i", long = "watch-interval", value_name = "MILLISECONDS", default_value = "250")]
+    /// Rerender at close to this interval when watching. Shorter time means quicker updates, while
+    /// longer time means less resource utilization.
+    watch_interval: u32,
 
+    #[structopt(name = "FORMAT", raw(long_help = "include_str!(\"../format_help.txt\")"))]
+    /// The format string. Full reference is available under the --help option.
+    template: String,
+}
+
+pub(crate) fn run(options: &Options, settings: &Settings) -> Result<(), Error> {
     let player = settings.find_player()?;
 
-    let handlebars = setup_handlebars(&template)?;
+    let handlebars = setup_handlebars(&options.template)?;
 
-    if watch {
-        let watch_interval = matches
-            .value_of("watch-interval")
-            .unwrap()
-            .parse()
-            .unwrap_or(DEFAULT_INTERVAL_MS);
-        watch_player(player, handlebars, watch_interval)?
+    if options.watch {
+        watch_player(player, handlebars, options.watch_interval)?
     } else {
         let metadata = player.get_metadata()?;
         let metadata_view = MetadataView::from_player(&metadata, &player)?;

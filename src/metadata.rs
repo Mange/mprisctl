@@ -3,19 +3,49 @@ extern crate mpris;
 extern crate serde;
 extern crate serde_json;
 
-use std::fmt::Display;
-use std::collections::HashMap;
-use super::{Error, Settings};
-use clap::ArgMatches;
 use self::dbus::arg::{ArgType, RefArg};
 use self::serde::{Serialize, Serializer};
+use super::{Error, Settings};
+use std::collections::HashMap;
+use std::fmt::Display;
+use structopt::StructOpt;
 
 use mpris::{DBusError, LoopStatus, Metadata, PlaybackStatus, Player, Progress};
+
+#[derive(StructOpt, Debug)]
+pub struct Options {
+    #[structopt(
+        short = "f",
+        long = "format",
+        default_value = "text",
+        raw(possible_values = "&Format::variants()")
+    )]
+    /// Render metadata in this format.
+    format: Format,
+}
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 enum Format {
     Text,
     JSON,
+}
+
+impl Format {
+    fn variants() -> [&'static str; 2] {
+        ["text", "json"]
+    }
+}
+
+impl std::str::FromStr for Format {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match caseless::default_case_fold_str(s).as_str() {
+            "text" => Ok(Format::Text),
+            "json" => Ok(Format::JSON),
+            _ => Err(format!("\"{}\" is not a valid format", s)),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -38,7 +68,8 @@ impl MetadataValue {
         match arg.arg_type() {
             ArgType::String => arg.as_str().map(|s| MetadataValue::String(String::from(s))),
             ArgType::Int64 => arg.as_i64().map(MetadataValue::Int64),
-            ArgType::Array => arg.as_iter()
+            ArgType::Array => arg
+                .as_iter()
                 .map(|iter| MetadataValue::Array(iter.flat_map(MetadataValue::try_from).collect())),
             _ => None,
         }
@@ -241,17 +272,12 @@ impl<'a> MetadataView<'a> {
     }
 }
 
-pub(crate) fn run(matches: Option<&ArgMatches>, settings: &Settings) -> Result<(), Error> {
+pub(crate) fn run(options: &Options, settings: &Settings) -> Result<(), Error> {
     let player = settings.find_player()?;
     let metadata = player.get_metadata()?;
     let metadata_view = MetadataView::from_player(&metadata, &player)?;
 
-    let format = match matches {
-        Some(matches) if matches.is_present("json") => Format::JSON,
-        _ => Format::Text,
-    };
-
-    match format {
+    match options.format {
         Format::Text => print_metadata(&metadata_view),
         Format::JSON => match serde_json::to_string(&metadata_view) {
             Ok(json) => {

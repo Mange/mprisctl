@@ -69,6 +69,7 @@ fn render_time(seconds: u64, width: Width, out: &mut Output) -> HelperResult {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::json;
 
     #[test]
     fn it_renders_with_dynamic_width() {
